@@ -1,0 +1,17 @@
+OCAML_LIBS = $(OCAML_LIBS_google-auth)
+
+FILES[] =
+  google_api_t
+  google_api_j
+  google_api_v
+  google_auth
+
+Atdgen(google_api, -j-std)
+OCamlLibrary(google-auth, $(FILES))
+Meta(google-auth)
+
+.DEFAULT: META google-auth.cma google-auth.cmxa
+
+.PHONY: clean
+clean:
+  rm -f *.o *.a *.cm* *~ *.annot *.run *.opt META $(ATDGEN_OUTFILES)

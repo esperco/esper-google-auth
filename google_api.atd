@@ -1,0 +1,6 @@
+type oauth_token_result = {
+  ?access_token : string option;
+  ?refresh_token: string option;
+  ?expires_in   : float  option;
+  ?error        : string option;
+}
