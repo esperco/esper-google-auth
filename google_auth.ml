@@ -24,6 +24,9 @@ let oauth_token_uri () =
 let form_headers =
   ["Content-Type", "application/x-www-form-urlencoded"]
 
+let auth_header access_token =
+  "Authorization", "Bearer " ^ access_token
+
 type ('a,'b)result = Good of 'a | Bad of 'b
 
 let get_token code redirect_uri =
