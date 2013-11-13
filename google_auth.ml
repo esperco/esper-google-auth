@@ -3,6 +3,7 @@ let client_secret = "dJjpTdtAouZq8UNzm1q0csbG"
 
 let (>>=) = Lwt.(>>=)
 
+(* email is only a login hint *)
 let auth_uri uid email =
   Uri.make
     ~scheme:"https"
