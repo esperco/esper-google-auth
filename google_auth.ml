@@ -4,7 +4,7 @@ let client_secret = "dJjpTdtAouZq8UNzm1q0csbG"
 let (>>=) = Lwt.(>>=)
 
 (* email is only a login hint *)
-let auth_uri uid email =
+let auth_uri state email =
   Uri.make
     ~scheme:"https"
     ~host:"accounts.google.com"
@@ -13,7 +13,7 @@ let auth_uri uid email =
             "client_id", [client_id];
             "redirect_uri", [App_path.google_oauth_callback_url ()];
             "scope", ["https://www.googleapis.com/auth/calendar"];
-            "state", [Uid.to_string uid];
+            "state", [Google_api_j.string_of_state state];
             "access_type", ["offline"];
             "approval_prompt", ["force"];
             "login_hint", [Email.to_string email]]
