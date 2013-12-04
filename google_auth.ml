@@ -16,7 +16,7 @@ let auth_uri state email =
             "state", [Google_api_j.string_of_state state];
             "access_type", ["offline"];
             "approval_prompt", ["force"];
-            "login_hint", [Email.to_string email]]
+           ]
     ()
 
 let oauth_token_uri () =
