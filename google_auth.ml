@@ -1,7 +1,8 @@
+open Log
+open Lwt
+
 let client_id = "791317799058.apps.googleusercontent.com"
 let client_secret = "dJjpTdtAouZq8UNzm1q0csbG"
-
-let (>>=) = Lwt.(>>=)
 
 (* email is only a login hint *)
 let auth_uri state email =
@@ -41,33 +42,35 @@ let get_token code redirect_uri =
   >>= fun (_status, _headers, body) ->
   match Google_api_j.oauth_token_result_of_string body with
     | {Google_api_t.error = Some error} ->
-      Lwt.return (Bad error)
+      return (Bad error)
 
     | {Google_api_t.refresh_token = Some refresh_token; error = None;
        access_token; expires_in} ->
       let expiration = Unix.time () +. BatOption.default 0. expires_in in
-      Lwt.return (Good {Account_t.access_token; refresh_token; expiration})
+      return (Good {Account_t.access_token; refresh_token; expiration})
 
     | {Google_api_t.refresh_token = None; error = None} ->
-      Lwt.return (Bad "no refresh token")
+      return (Bad "no refresh token")
 
 let refresh token =
   match token with
     | {Account_t.access_token = Some _ as access_token; expiration}
         when Unix.time () +. 600. <= expiration ->
-      Lwt.return (None, access_token)
+        logf `Info "refresh: found valid access_token";
+        return (None, access_token)
     | {Account_t.refresh_token} ->
-      let q = ["refresh_token", [refresh_token];
-               "client_id",     [client_id];
-               "client_secret", [client_secret];
-               "grant_type",    ["refresh_token"]] in
-      let body = Uri.encoded_of_query q in
-      Util_http_client.post ~headers:form_headers ~body (oauth_token_uri ())
-      >>= fun (_status, _headers, body) ->
-      match Google_api_j.oauth_token_result_of_string body with
+        logf `Info "refresh: need to refresh";
+        let q = ["refresh_token", [refresh_token];
+                 "client_id",     [client_id];
+                 "client_secret", [client_secret];
+                 "grant_type",    ["refresh_token"]] in
+        let body = Uri.encoded_of_query q in
+        Util_http_client.post ~headers:form_headers ~body (oauth_token_uri ())
+        >>= fun (_status, _headers, body) ->
+        match Google_api_j.oauth_token_result_of_string body with
         | {Google_api_t.access_token = Some _ as access_token; expires_in} ->
-          let expiration = Unix.time () +. BatOption.default 0. expires_in in
-          Lwt.return (Some {Account_t.refresh_token; access_token; expiration},
-                      access_token)
+            let expiration = Unix.time () +. BatOption.default 0. expires_in in
+            return (Some {Account_t.refresh_token; access_token; expiration},
+                        access_token)
         | _ ->
-          Lwt.return (None, None)
+            return (None, None)

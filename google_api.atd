@@ -1,9 +1,21 @@
+(* https://developers.google.com/youtube/v3/guides/authentication *)
+
 type oauth_token_result = {
   ?access_token : string option;
   ?refresh_token: string option;
   ?expires_in   : float  option;
   ?error        : string option;
 }
+(*
+  Google will respond to your POST request by returning a JSON object
+  that contains a short-lived access token and a refresh token.
+{
+  "access_token" : "ya29.AHES6ZTtm7SuokEB-RGtbBty9IIlNiP9-eNMMQKtXdMP3sfjL1Fc",
+  "token_type" : "Bearer",
+  "expires_in" : 3600,
+  "refresh_token" : "1/HKSmLFXzqP0leUihZp2xUt3-5wkU7Gmu2Os_eBnzw74"
+}
+*)
 
 type state = {
   uid: uid;
