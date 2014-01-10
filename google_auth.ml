@@ -56,7 +56,6 @@ let refresh token =
   match token with
     | {Account_t.access_token = Some _ as access_token; expiration}
         when Unix.time () +. 600. <= expiration ->
-        logf `Info "refresh: found valid access_token";
         return (None, access_token)
     | {Account_t.refresh_token} ->
         logf `Info "refresh: need to refresh";
