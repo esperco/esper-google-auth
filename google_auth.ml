@@ -23,6 +23,10 @@ let auth_uri state email =
 let oauth_token_uri () =
   Uri.of_string "https://accounts.google.com/o/oauth2/token"
 
+let oauth_revoke_uri access_token =
+  Uri.of_string ("https://accounts.google.com/o/oauth2/revoke?token="
+                 ^ Uri.pct_encode access_token)
+
 let form_headers =
   ["Content-Type", "application/x-www-form-urlencoded"]
 
@@ -30,6 +34,16 @@ let auth_header access_token =
   "Authorization", "Bearer " ^ access_token
 
 type ('a,'b)result = Good of 'a | Bad of 'b
+
+let oauth_revoke access_token =
+  Util_http_client.get (oauth_revoke_uri access_token) >>= function
+  | (`OK, _headers, _body) ->
+      (* Google returns true even if the token was already revoked *)
+      return true
+  | (_status, _headers, body) ->
+      (* Malformed token etc. *)
+      logf `Warning "Google token revocation failed: %s" body;
+      return false
 
 let get_token code redirect_uri =
   let q = ["code",          [code];
