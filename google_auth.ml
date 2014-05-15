@@ -13,7 +13,7 @@ let auth_uri state email =
     ~query:["response_type", ["code"];
             "client_id", [client_id];
             "redirect_uri", [App_path.google_oauth_callback_url ()];
-            "scope", ["https://www.googleapis.com/auth/calendar"];
+            "scope", ["https://mail.google.com/"];
             "state", [Google_api_j.string_of_state state];
             "access_type", ["offline"];
             "approval_prompt", ["force"];
