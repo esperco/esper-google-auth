@@ -15,6 +15,7 @@ let auth_uri state email =
             "redirect_uri", [App_path.google_oauth_callback_url ()];
             "scope", ["profile \
                        https://mail.google.com/ \
+                       https://www.google.com/m8/feeds \
                        https://www.googleapis.com/auth/calendar"];
             "state", [Google_api_j.string_of_state state];
             "access_type", ["offline"];
