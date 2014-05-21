@@ -4,6 +4,34 @@ open Lwt
 let client_id = "791317799058.apps.googleusercontent.com"
 let client_secret = "dJjpTdtAouZq8UNzm1q0csbG"
 
+(*
+   List of permissions requested
+*)
+let scopes = String.concat " " (List.sort String.compare [
+  (*
+     Sign-in (this scope includes the profile scope)
+     https://developers.google.com/+/api/oauth#plus.login
+     https://developers.google.com/+/api/oauth#profile
+  *)
+  "https://www.googleapis.com/auth/plus.login";
+
+  (*
+     Let us retrieve the email address used by the user for authentication
+     so we can tie it to an Esper account.
+     https://developers.google.com/+/api/oauth#email
+  *)
+  "email";
+
+  (* GMail messages *)
+  "https://mail.google.com/";
+
+  (* Addressbook *)
+  "https://www.google.com/m8/feeds";
+
+  (* Calendar *)
+  "https://www.googleapis.com/auth/calendar";
+])
+
 (* email is only a login hint *)
 let auth_uri state email =
   Uri.make
@@ -13,10 +41,7 @@ let auth_uri state email =
     ~query:["response_type", ["code"];
             "client_id", [client_id];
             "redirect_uri", [App_path.google_oauth_callback_url ()];
-            "scope", ["profile \
-                       https://mail.google.com/ \
-                       https://www.google.com/m8/feeds \
-                       https://www.googleapis.com/auth/calendar"];
+            "scope", [scopes];
             "state", [Google_api_j.string_of_state state];
             "access_type", ["offline"];
             "approval_prompt", ["force"];
