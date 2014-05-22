@@ -17,11 +17,12 @@ type oauth_token_result = {
 }
 *)
 
+(*
+   State passed along during the Google OAuth process.
+*)
 type state = {
-  uid: uid;
-
-  (* landing URL when everything was successful *)
   ?ok_url: string option;
+    (* landing URL when everything was successful *)
 }
 
 type uid <ocaml from="Core" t="uid"> = abstract
