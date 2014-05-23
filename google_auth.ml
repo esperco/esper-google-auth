@@ -32,8 +32,7 @@ let scopes = String.concat " " (List.sort String.compare [
   "https://www.googleapis.com/auth/calendar";
 ])
 
-(* email is only a login hint *)
-let auth_uri state email =
+let auth_uri state =
   Uri.make
     ~scheme:"https"
     ~host:"accounts.google.com"
