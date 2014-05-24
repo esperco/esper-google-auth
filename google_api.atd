@@ -21,6 +21,22 @@ type oauth_token_result = {
    State passed along during the Google OAuth process.
 *)
 type state = {
+  ?login_secret: string option;
+    (* Secret chosen by the client and passed through Google authentication
+       to the Esper server.
+
+       1. Client starts the oauth process, passing this newly-generated
+          secret to Google.
+       2. Once the user is authenticated with Google, Googles posts
+          the secret to Esper. Esper now knows that this secret belongs to
+          the Google account owner.
+       3. At the end of the oauth process, the user is redirected to an
+          Esper page.
+       4. The secret is posted from the Esper page, and the Esper server
+          responds with login info, including the api_secret that
+          will be used for Esper API queries.
+    *)
+
   ?ok_url: string option;
     (* landing URL when everything was successful *)
 }
