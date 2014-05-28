@@ -21,7 +21,7 @@ type oauth_token_result = {
    State passed along during the Google OAuth process.
 *)
 type state = {
-  ?login_secret: string option;
+  ?login_nonce: string option;
     (* Secret chosen by the client and passed through Google authentication
        to the Esper server.
 
