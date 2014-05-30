@@ -37,8 +37,13 @@ type state = {
           will be used for Esper API queries.
     *)
 
+  ?invite: token option;
+    (* invite token, which results in the creation of an api_secret for
+       the user, making the user a full Esper member. *)
+
   ?ok_url: string option;
     (* landing URL when everything was successful *)
 }
 
 type uid <ocaml from="Core" t="uid"> = abstract
+type token <ocaml from="Core" t="token"> = abstract
