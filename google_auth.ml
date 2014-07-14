@@ -1,8 +1,9 @@
 open Log
 open Lwt
 
-let client_id = "791317799058.apps.googleusercontent.com"
-let client_secret = "dJjpTdtAouZq8UNzm1q0csbG"
+let client_id =
+  "1037853372111-j9jiqqpju3q0ovihj3vnon9fi7nuclvr.apps.googleusercontent.com"
+let client_secret = "SRXOeDGlOHiup67sHcluTazd"
 
 (*
    List of permissions requested
