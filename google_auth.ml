@@ -80,6 +80,10 @@ let oauth_revoke_uri access_token =
   Uri.of_string ("https://accounts.google.com/o/oauth2/revoke?token="
                  ^ Uri.pct_encode access_token)
 
+let oauth_validate_uri token =
+  Uri.of_string ("https://www.googleapis.com/oauth2/v1/tokeninfo?id_token="
+                 ^ Uri.pct_encode token)
+
 let form_headers =
   ["Content-Type", "application/x-www-form-urlencoded"]
 
@@ -171,3 +175,20 @@ let refresh token =
                         access_token)
         | _ ->
             return (None, None)
+
+let get_token_email token =
+  Util_http_client.get (oauth_validate_uri token) >>= function
+  | (`OK, _headers, body) ->
+      (match Google_api_j.token_info_of_string body with
+      | {Google_api_t.token_issuer = "accounts.google.com";
+         token_email = Some email;
+         token_audience; token_expires_in; token_issued_at}
+        when token_audience = client_id
+          && Unix.time () <= token_issued_at +. token_expires_in ->
+          return (Some (Email.of_string email))
+      | _ ->
+          logf `Warning "token validated, but with wrong info: %s" body;
+          return None)
+  | (_status, _headers, body) ->
+      logf `Warning "token validation failed: %s" body;
+      return None

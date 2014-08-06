@@ -45,5 +45,14 @@ type state = {
     (* landing URL when everything was successful *)
 }
 
+type token_info = {
+  issuer    : string;        (* "accounts.google.com" *)
+  audience  : string;        (* our client ID *)
+  expires_in: float;         (* seconds *)
+  issued_at : float;         (* date *)
+  ?email    : string option; (* user's authorization email *)
+  (* more fields omitted *)
+} <ocaml field_prefix="token_">
+
 type uid <ocaml from="Core" t="uid"> = abstract
 type token <ocaml from="Core" t="token"> = abstract
