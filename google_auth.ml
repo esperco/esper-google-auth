@@ -74,15 +74,23 @@ let auth_uri ?login_hint ~request_new_refresh_token state =
     ()
 
 let oauth_token_uri () =
-  Uri.of_string "https://accounts.google.com/o/oauth2/token"
+  Google_api_util.make_uri
+    ~host: "accounts.google.com"
+    ~path: "/o/oauth2/token"
+    ()
 
 let oauth_revoke_uri access_token =
-  Uri.of_string ("https://accounts.google.com/o/oauth2/revoke?token="
-                 ^ Uri.pct_encode access_token)
+  Google_api_util.make_uri
+    ~host: "accounts.google.com"
+    ~path: "/o/oauth2/revoke"
+    ~query: ["token", [access_token]]
+    ()
 
 let oauth_validate_uri token =
-  Uri.of_string ("https://www.googleapis.com/oauth2/v1/tokeninfo?id_token="
-                 ^ Uri.pct_encode token)
+  Google_api_util.make_uri
+    ~path: "/oauth2/v1/tokeninfo"
+    ~query: ["id_token", [token]]
+    ()
 
 let form_headers =
   ["Content-Type", "application/x-www-form-urlencoded"]
