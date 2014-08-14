@@ -185,6 +185,8 @@ let refresh token =
             return (None, None)
 
 let get_token_email token =
+  (* An extra two hours to the expires_in time because Google gets desynchronized from our server... *)
+  let grace_period = 60. *. 60. *. 2. in 
   Util_http_client.get (oauth_validate_uri token) >>= function
   | (`OK, _headers, body) ->
       (match Google_api_j.token_info_of_string body with
@@ -192,7 +194,7 @@ let get_token_email token =
          token_email = Some email;
          token_audience; token_expires_in; token_issued_at}
         when token_audience = client_id
-          && Unix.time () <= token_issued_at +. token_expires_in ->
+          && Unix.time () <= token_issued_at +. token_expires_in +. grace_period ->
           return (Some (Email.of_string email))
       | _ ->
           logf `Warning "token validated, but with wrong info: %s" body;
