@@ -10,11 +10,16 @@ let client_secret = "SRXOeDGlOHiup67sHcluTazd"
 *)
 let scopes = String.concat " " [
   (*
-     Sign-in (this scope includes the profile scope)
-     https://developers.google.com/+/api/oauth#plus.login
-     https://developers.google.com/+/api/oauth#profile
+     Access user's basic profile (name, photo)
+
+     See https://developers.google.com/+/api/oauth#profile
+
+     Google recommends that we use plus.login, which requests scary
+     Google+ write permissions so we don't do that. As far as I can see
+     we don't need that, it's just Google trying to push us to use
+     their Google+ social network.
   *)
-  "https://www.googleapis.com/auth/plus.login";
+  "profile";
 
   (*
      Let us retrieve the email address used by the user for authentication
