@@ -149,49 +149,48 @@ let get_token code redirect_uri =
         return (Error "missing tokens")
 
 (*
-  Get a valid access_token from a refresh_token, fetching and storing
-  a new one if the last access_token has expired.
+   Get a valid access_token from a refresh_token, fetching and storing
+   a new one from Google regardless of the expiration date, which
+   is unreliable because of clock issues.
+
+   Possible outcomes:
+   - Some: got an access_token
+   - None: invalid refresh_token
+   - exception: retry later
 *)
 let refresh token =
-  (*
-     The grace period is how early before the expiration it is acceptable
-     to request a new access token. This is not documented by Google,
-     we are just guessing. The problem is that Google refuses to produce
-     a new access token if the last issued access token is still valid.
+  logf `Info "Refreshing Google access token";
+  let open Account_t in
+  let {refresh_token} = token in
+  let q = ["refresh_token", [refresh_token];
+           "client_id",     [client_id];
+           "client_secret", [client_secret];
+           "grant_type",    ["refresh_token"]] in
+  let body = Uri.encoded_of_query q in
+  Util_http_client.post ~headers:form_headers ~body (oauth_token_uri ())
+  >>= fun (_status, _headers, body) ->
+  match Google_api_j.oauth_token_result_of_string body with
+  | {Google_api_t.access_token = Some access_token; expires_in} ->
+      let expiration = Unix.time () +. BatOption.default 0. expires_in in
+      return (Some ({
+        Account_t.refresh_token;
+        access_token = Some access_token;
+        expiration
+      }, access_token))
 
-     It requires our clocks to be synchronized with
-     each other to that precision and it must leave enough time
-     to perform the subsequent api request to Google using the access token
-     that may be almost expired.
+  | {Google_api_t.error = Some "invalid_grant"} ->
+      return None
 
-     A better approach might be "try api call, refresh token if needed, retry"
-     as described here: http://stackoverflow.com/a/22810510/597517
-  *)
-  let grace_period = 60. in
-  match token with
-    | {Account_t.access_token = Some _ as access_token; expiration}
-        when Unix.time () +. grace_period <= expiration ->
-        return (None, access_token)
-    | {Account_t.refresh_token} ->
-        logf `Info "refresh: need to refresh";
-        let q = ["refresh_token", [refresh_token];
-                 "client_id",     [client_id];
-                 "client_secret", [client_secret];
-                 "grant_type",    ["refresh_token"]] in
-        let body = Uri.encoded_of_query q in
-        Util_http_client.post ~headers:form_headers ~body (oauth_token_uri ())
-        >>= fun (_status, _headers, body) ->
-        match Google_api_j.oauth_token_result_of_string body with
-        | {Google_api_t.access_token = Some _ as access_token; expires_in} ->
-            let expiration = Unix.time () +. BatOption.default 0. expires_in in
-            return (Some {Account_t.refresh_token; access_token; expiration},
-                        access_token)
-        | _ ->
-            return (None, None)
+  | {Google_api_t.error = Some errmsg} ->
+      failwith ("Unknown error response from Google: " ^ errmsg)
+  | _ ->
+      failwith "Invalid response from Google"
+
 
 let get_token_email token =
-  (* An extra two hours to the expires_in time because Google gets desynchronized from our server... *)
-  let grace_period = 60. *. 60. *. 2. in 
+  (* An extra two hours to the expires_in time because Google gets
+     desynchronized from our server... *)
+  let grace_period = 60. *. 60. *. 2. in
   Util_http_client.get (oauth_validate_uri token) >>= function
   | (`OK, _headers, body) ->
       (match Google_api_j.token_info_of_string body with
