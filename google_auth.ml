@@ -158,10 +158,10 @@ let get_token code redirect_uri =
    - None: invalid refresh_token
    - exception: retry later
 *)
-let refresh token =
+let refresh tokens =
   logf `Info "Refreshing Google access token";
   let open Account_t in
-  let {refresh_token} = token in
+  let {refresh_token} = tokens in
   let q = ["refresh_token", [refresh_token];
            "client_id",     [client_id];
            "client_secret", [client_secret];
