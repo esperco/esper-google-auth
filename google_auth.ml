@@ -6,9 +6,10 @@ let client_id =
 let client_secret = "SRXOeDGlOHiup67sHcluTazd"
 
 (*
-   List of permissions requested
+   Minimum list of permissions requested upfront for anyone signing in
+   with Google.
 *)
-let scopes = String.concat " " [
+let minimum_scopes = String.concat " " [
   (*
      Access user's basic profile (name, photo)
 
@@ -28,17 +29,32 @@ let scopes = String.concat " " [
   *)
   "email";
 
-  (* GMail messages *)
-  "https://mail.google.com/";
+  (*
+     Calendar access.
 
-  (* Addressbook *)
-  "https://www.google.com/m8/feeds";
+     Assistant: required
 
-  (* Calendar *)
+     Executive: required, should be made optional.
+     This is used only to make it easier for the executive
+     to delegate calendars to the assistant.
+     We should request this permission optionally where it is needed
+     in the setup flow.
+  *)
   "https://www.googleapis.com/auth/calendar";
 ]
 
-let auth_uri ?login_hint ~request_new_refresh_token state =
+let minimum_executive_scopes = String.concat " " [
+  minimum_scopes;
+]
+
+let minimum_assistant_scopes = String.concat " " [
+  minimum_scopes;
+
+  (* GMail messages *)
+  "https://mail.google.com/";
+]
+
+let auth_uri ?login_hint ~request_new_refresh_token ~scopes state =
   let approval_prompt =
     if request_new_refresh_token then
       (*
