@@ -91,6 +91,7 @@ let auth_uri ?login_hint ~request_new_refresh_token ~scopes state =
       "state", [Google_api_j.string_of_state state];
       "access_type", ["offline"];
       "approval_prompt", [approval_prompt];
+      "include_granted_scopes", ["true"];
     ] @ login_hint)
     ()
 
