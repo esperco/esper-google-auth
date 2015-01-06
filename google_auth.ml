@@ -203,23 +203,35 @@ let refresh tokens =
   | _ ->
       failwith "Invalid response from Google"
 
+let get_token_info token_of_string token =
+  Util_http_client.get (oauth_validate_uri token) >>= function
+  | (`OK, _headers, body) ->
+      return (Some (token_of_string body))
+  | (_status, _headers, body) ->
+      logf `Warning "token validation failed: %s" body;
+      return None
 
-let get_token_email token =
+let get_access_token_info access_token =
+  get_token_info Google_api_j.access_token_info_of_string access_token
+
+let get_id_token_info id_token =
+  get_token_info Google_api_j.id_token_info_of_string id_token
+
+let get_id_token_email token =
   (* An extra two hours to the expires_in time because Google gets
      desynchronized from our server... *)
   let grace_period = 60. *. 60. *. 2. in
-  Util_http_client.get (oauth_validate_uri token) >>= function
-  | (`OK, _headers, body) ->
-      (match Google_api_j.token_info_of_string body with
-      | {Google_api_t.token_issuer = "accounts.google.com";
-         token_email = Some email;
-         token_audience; token_expires_in; token_issued_at}
-        when token_audience = client_id
-          && Unix.time () <= token_issued_at +. token_expires_in +. grace_period ->
-          return (Some (Email.of_string email))
-      | _ ->
-          logf `Warning "token validated, but with wrong info: %s" body;
-          return None)
-  | (_status, _headers, body) ->
-      logf `Warning "token validation failed: %s" body;
+  get_id_token_info token >>= function
+  | Some { Google_api_t.id_token_issuer = "accounts.google.com";
+           id_token_email = Some email;
+           id_token_audience; id_token_expires_in; id_token_issued_at}
+    when id_token_audience = client_id
+      && Unix.time () <=
+         id_token_issued_at +. id_token_expires_in +. grace_period ->
+      return (Some email)
+  | None ->
+      return None
+  | Some x ->
+      logf `Warning "token validated, but with wrong info: %s"
+        (Google_api_j.string_of_id_token_info x);
       return None

@@ -1,4 +1,9 @@
-(* https://developers.google.com/youtube/v3/guides/authentication *)
+(* https://developers.google.com/accounts/docs/OAuth2WebServer *)
+
+type uid <ocaml from="Core" t="uid"> = abstract
+type token <ocaml from="Core" t="token"> = abstract
+type scope = string wrap <ocaml module="Google_scope">
+type email = string wrap <ocaml module="Email">
 
 type oauth_token_result = {
   ?access_token : string option;
@@ -45,14 +50,62 @@ type state = {
     (* landing URL when everything was successful *)
 }
 
-type token_info = {
+
+(*
+   There's no official documentation for those fields.
+
+   (the closest official documentation is the one given here:
+   https://developers.google.com/accounts/docs/OpenIDConnect#obtainuserinfo
+   all fields are abbreviated but seem to match what we get here.)
+
+   Look into the libraries provided by Google for more assurance.
+*)
+type id_token_info = {
   issuer    : string;        (* "accounts.google.com" *)
   audience  : string;        (* our client ID *)
   expires_in: float;         (* seconds *)
   issued_at : float;         (* date *)
-  ?email    : string option; (* user's authorization email *)
+  ?email    : email option;  (* user's authorization email *)
   (* more fields omitted *)
-} <ocaml field_prefix="token_">
+} <ocaml field_prefix="id_token_">
 
-type uid <ocaml from="Core" t="uid"> = abstract
-type token <ocaml from="Core" t="token"> = abstract
+
+(*
+   Only an incomplete "type" is given by the official documentation.
+   https://developers.google.com/accounts/docs/OAuth2UserAgent#validatetoken
+
+   Try:
+     curl https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=...
+
+   (works only with an access_token, not directly with a refresh_token)
+*)
+type access_token_info = {
+  audience: string;
+    (* The application that is the intended target of the token.
+       (our client ID) *)
+
+  scope: scope;
+    (* The space-delimited set of scopes that the user consented to. *)
+
+  userid: string option; (* e.g. "user_id": "111908179428740497447" *)
+    (*
+       This field is only present if the profile scope was present in
+       the request. The value of this field is an immutable identifier
+       for the logged-in user, and may be used when creating and
+       managing user sessions in your application. This identifier is
+       the same regardless of the client ID. This provides the ability
+       to correlate profile information across multiple applications
+       in the same organization.
+    *)
+
+  expires_in: float;
+    (* The number of seconds left in the lifetime of the token. *)
+
+
+  (*** Undocumented fields found in Google responses ***)
+
+  ?email: email option;
+  ?verified_email: bool option;
+  ?access_type: string option; (* e.g. "offline" *)
+
+} <ocaml field_prefix="access_token_">
