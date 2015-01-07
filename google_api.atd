@@ -87,7 +87,7 @@ type access_token_info = {
   scope: scope;
     (* The space-delimited set of scopes that the user consented to. *)
 
-  userid: string option; (* e.g. "user_id": "111908179428740497447" *)
+  ?user_id: string option; (* e.g. "user_id": "111908179428740497447" *)
     (*
        This field is only present if the profile scope was present in
        the request. The value of this field is an immutable identifier
@@ -96,6 +96,8 @@ type access_token_info = {
        the same regardless of the client ID. This provides the ability
        to correlate profile information across multiple applications
        in the same organization.
+
+       Note: official doc in one place refers to 'userid'. It is 'user_id'.
     *)
 
   expires_in: float;

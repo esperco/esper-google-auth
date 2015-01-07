@@ -9,7 +9,7 @@ let client_secret = "SRXOeDGlOHiup67sHcluTazd"
    Minimum list of permissions requested upfront for anyone signing in
    with Google.
 *)
-let minimum_scopes = String.concat " " [
+let minimum_scopes = [
   (*
      Access user's basic profile (name, photo)
 
@@ -20,14 +20,14 @@ let minimum_scopes = String.concat " " [
      we don't need that, it's just Google trying to push us to use
      their Google+ social network.
   *)
-  "profile";
+  `Profile;
 
   (*
      Let us retrieve the email address used by the user for authentication
      so we can tie it to an Esper account.
      https://developers.google.com/+/api/oauth#email
   *)
-  "email";
+  `Email_address;
 
   (*
      Calendar access.
@@ -40,18 +40,14 @@ let minimum_scopes = String.concat " " [
      We should request this permission optionally where it is needed
      in the setup flow.
   *)
-  "https://www.googleapis.com/auth/calendar";
+  `Calendar;
 ]
 
-let minimum_executive_scopes = String.concat " " [
-  minimum_scopes;
-]
+let minimum_executive_scopes = minimum_scopes
 
-let minimum_assistant_scopes = String.concat " " [
-  minimum_scopes;
-
+let minimum_assistant_scopes = minimum_scopes @ [
   (* GMail messages *)
-  "https://mail.google.com/";
+  `Gmail;
 ]
 
 let auth_uri ?login_hint ~request_new_refresh_token ~scopes state =
@@ -87,7 +83,7 @@ let auth_uri ?login_hint ~request_new_refresh_token ~scopes state =
       "response_type", ["code"];
       "client_id", [client_id];
       "redirect_uri", [App_path.google_oauth_callback_url ()];
-      "scope", [scopes];
+      "scope", [Google_scope.concat scopes];
       "state", [Google_api_j.string_of_state state];
       "access_type", ["offline"];
       "approval_prompt", [approval_prompt];
@@ -108,10 +104,16 @@ let oauth_revoke_uri access_token =
     ~query: ["token", [access_token]]
     ()
 
-let oauth_validate_uri token =
+let oauth_id_token_info_uri token =
   Google_api_util.make_uri
     ~path: "/oauth2/v1/tokeninfo"
     ~query: ["id_token", [token]]
+    ()
+
+let oauth_access_token_info_uri token =
+  Google_api_util.make_uri
+    ~path: "/oauth2/v1/tokeninfo"
+    ~query: ["access_token", [token]]
     ()
 
 let form_headers =
@@ -203,19 +205,21 @@ let refresh tokens =
   | _ ->
       failwith "Invalid response from Google"
 
-let get_token_info token_of_string token =
-  Util_http_client.get (oauth_validate_uri token) >>= function
+let get_access_token_info access_token =
+  Util_http_client.get (oauth_access_token_info_uri access_token) >>= function
   | (`OK, _headers, body) ->
-      return (Some (token_of_string body))
+      return (Some (Google_api_j.access_token_info_of_string body))
   | (_status, _headers, body) ->
-      logf `Warning "token validation failed: %s" body;
+      logf `Warning "Access token validation failed: %s" body;
       return None
 
-let get_access_token_info access_token =
-  get_token_info Google_api_j.access_token_info_of_string access_token
-
 let get_id_token_info id_token =
-  get_token_info Google_api_j.id_token_info_of_string id_token
+  Util_http_client.get (oauth_id_token_info_uri id_token) >>= function
+  | (`OK, _headers, body) ->
+      return (Some (Google_api_j.id_token_info_of_string body))
+  | (_status, _headers, body) ->
+      logf `Warning "ID token validation failed: %s" body;
+      return None
 
 let get_id_token_email token =
   (* An extra two hours to the expires_in time because Google gets
