@@ -10,12 +10,26 @@ type scope = [
 
 type t = scope list
 
+(*
+   See https://developers.google.com/+/api/oauth#scopes
+   for details on the profile and email scopes.
+*)
 let parse_scope = function
   | "profile"
-  | "https://www.googleapis.com/auth/userinfo.profile" -> Some `Profile
+      (* View your basic profile info *)
+  | "https://www.googleapis.com/auth/userinfo.profile"
+      (* synonym for "profile" *)
+  | "https://www.googleapis.com/auth/plus.login"
+      (* Know your basic profile info and list of people in your circles. *)
+    -> Some `Profile
 
   | "email"
-  | "https://www.googleapis.com/auth/userinfo.email" -> Some `Email_address
+      (* View your email address *)
+  | "https://www.googleapis.com/auth/userinfo.email"
+      (* synonym for "email" *)
+  | "https://www.googleapis.com/auth/plus.profile.emails.read"
+      (* get email address + other things *)
+    -> Some `Email_address
 
   | "https://www.googleapis.com/auth/calendar" -> Some `Calendar
 
