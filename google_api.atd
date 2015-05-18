@@ -4,6 +4,7 @@ type uid <ocaml from="Core" t="uid"> = abstract
 type token <ocaml from="Core" t="token"> = abstract
 type scope = string wrap <ocaml module="Google_scope">
 type email = string wrap <ocaml module="Email">
+type teamid = string wrap <ocaml module="Teamid">
 
 type oauth_token_result = {
   ?access_token : string option;
@@ -48,7 +49,16 @@ type state = {
 
   ?ok_url: string option;
     (* landing URL when everything was successful *)
+
+  ?authorized_for: authorized_party option;
+    (* The token is to be shared to an existing team,
+       not to create a new user account. *)
 }
+
+type authorized_party = {
+  uid: uid;
+  teamid: teamid;
+} <ocaml field_prefix="state_">
 
 
 (*
