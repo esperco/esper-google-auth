@@ -322,7 +322,7 @@ module Refresher(Db: STORE): REFRESHER with type key = Db.key = struct
             (match opt_token with
              | None ->
                  Http_exn.unauthorized
-                   ("Invalid OAuth refresh_token " ^ Db.string_of_key key)
+                   ("Invalid OAuth refresh_token for " ^ Db.string_of_key key)
              | Some token ->
                  Cloudwatch.send_event "google.api.retry" >>= fun () ->
                  request token >>= function
