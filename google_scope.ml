@@ -6,8 +6,9 @@ type scope = [
   | `Email_address
   | `Calendar
   | `Gmail
-  | `Drive          (* Requests *full* access to a user's Google Drive. This is fine for
-                       internal use (ie docs@esper.com) but too broad for clients. *)
+  | `Drive
+      (* Requests *full* access to a user's Google Drive. This is fine for
+         internal use (ie docs@esper.com) but too broad for clients. *)
 ]
 
 type t = scope list
