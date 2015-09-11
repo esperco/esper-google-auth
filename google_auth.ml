@@ -177,10 +177,9 @@ let get_token code redirect_uri =
    - None: invalid refresh_token
    - exception: retry later
 *)
-let refresh tokens =
+let refresh (refresh_token, opt_access_token) =
   logf `Info "Refreshing Google access token";
   let open Account_t in
-  let {refresh_token} = tokens in
   let q = ["refresh_token", [refresh_token];
            "client_id",     [client_id];
            "client_secret", [client_secret];
@@ -191,11 +190,10 @@ let refresh tokens =
   match Google_api_j.oauth_token_result_of_string body with
   | {Google_api_t.access_token = Some access_token; expires_in} ->
       let expiration = Unix.time () +. BatOption.default 0. expires_in in
-      return (Some ({
-        Account_t.refresh_token;
-        access_token = Some access_token;
-        expiration
-      }, access_token))
+      return (Some (
+        (refresh_token, Some (access_token, expiration)),
+        access_token
+      ))
 
   | {Google_api_t.error = Some "invalid_grant"} ->
       return None
@@ -242,100 +240,106 @@ let get_id_token_email token =
 
 
 let access_valid tokens =
-  Unix.time () < tokens.Account_t.expiration -. 60.
+  match tokens with
+  | refresh_token, Some (access_token, expiration) ->
+      Unix.time () < expiration -. 60.
+  | _ ->
+      false
 
-module type STORE = sig
-  type key
-  val string_of_key: key -> string (* for logging *)
-  val get: key -> Account_t.google_oauth_token option Lwt.t
-  val put: key -> Account_t.google_oauth_token -> unit Lwt.t
-  val remove: key -> Account_t.google_oauth_token option Lwt.t
-end
+(*
+   (refresh_token, Some (access_token, access_token_expiration))
+*)
+type google_oauth_tokens = string * (string * float) option
 
-module type REFRESHER = sig
-  type key
-  val get: refresh:bool -> key -> string option Lwt.t
-  val request: key -> (string -> 'a Http_result.retriable Lwt.t) -> 'a Lwt.t
-end
+(*
+   Abstract definition of the storage functions required for OAuth.
+   The storage key 'k is associated with at most one Google account.
+*)
+type 'k token_store = {
+  string_of_key: 'k -> string;
+    (* for logging *)
+  username: 'k -> string option Lwt.t;
+    (* Google email address *)
+  get: 'k -> google_oauth_tokens option Lwt.t;
+  put: 'k -> google_oauth_tokens -> unit Lwt.t;
+  remove: 'k -> google_oauth_tokens option Lwt.t;
+}
 
-module Refresher(Db: STORE): REFRESHER with type key = Db.key = struct
-  type key = Db.key
+let get_access_token (ts : _ token_store) ~refresh:refresh_it key =
+  ts.get key >>= function
+  | Some (refresh_token, Some (access_token, t) as tokens)
+      when not refresh_it && access_valid tokens ->
+      (* return access_token without checking its validity, which
+         requires an API call. *)
+      return (Some access_token)
 
-  let get ~refresh:refresh_it key =
-    Db.get key >>= function
-    | Some ({ Account_t.access_token = Some access_token } as tokens)
-         when not refresh_it && access_valid tokens ->
-        (* return access_token without checking its validity, which
-           requires an API call. *)
-        return (Some access_token)
-
-    | Some tokens ->
-        (refresh tokens >>= function
-         | Some (r, access_token) ->
-             Db.put key r >>= fun () ->
-             return (Some access_token)
-         | None ->
-             (* invalid refresh_token needs to be removed *)
-             logf `Warning "refresh_token became invalid, removing it";
-             Db.remove key >>= function
-             | None -> return None
-             | Some { Account_t.refresh_token } ->
-                 oauth_revoke refresh_token >>= fun _success ->
-                 return None
-        )
-    | None ->
-        return None
+  | Some tokens ->
+      (refresh tokens >>= function
+       | Some (tokens, access_token) ->
+           ts.put key tokens >>= fun () ->
+           return (Some access_token)
+       | None ->
+           (* invalid refresh_token needs to be removed *)
+           logf `Warning "refresh_token became invalid, removing it";
+           ts.remove key >>= function
+           | None -> return None
+           | Some (refresh_token, _) ->
+               oauth_revoke refresh_token >>= fun _success ->
+               return None
+      )
+  | None ->
+      return None
 
 (*
    Make a request requiring a Google access token.
    If the stored access token turns out to be invalid,
    the call is retried after obtaining a fresh access token from Google.
 *)
-  let request
-        key
-        (request_with_token : string -> 'a Http_result.retriable Lwt.t)
-      : 'a Lwt.t =
+let request
+    (ts : _ token_store)
+    key
+    (request_with_token : string -> 'a Http_result.retriable Lwt.t)
+  : 'a Lwt.t =
 
-    let request token =
-      Cloudwatch.time "google.api.any.latency" (fun () ->
-        request_with_token token
-      )
-    in
+  let request token =
+    Cloudwatch.time "google.api.any.latency" (fun () ->
+      request_with_token token
+    )
+  in
 
-    get ~refresh:false key >>= function
-    | None -> Http_exn.unauthorized
-                ("Missing OAuth token " ^ Db.string_of_key key)
-    | Some token ->
-        request token >>= fun x ->
-        match x with
-        | `Retry_unauthorized
-        | `Retry_5xx ->
-            (match x with
-             | `Retry_unauthorized ->
-                 get ~refresh:true key
-             | `Retry_5xx ->
-                 Lwt_unix.sleep 1.0 >>= fun () ->
-                 return (Some token)
-             | `Result _ ->
-                 assert false
-            ) >>= fun opt_token ->
-            (match opt_token with
-             | None ->
-                 Http_exn.unauthorized
-                   ("Invalid OAuth refresh_token for " ^ Db.string_of_key key)
-             | Some token ->
-                 Cloudwatch.send_event "google.api.retry" >>= fun () ->
-                 request token >>= function
-                 | `Retry_unauthorized ->
-                     failwith
-                       ("Cannot authenticate with fresh access_token"
-                        ^ Db.string_of_key key)
+  get_access_token ts ~refresh:false key >>= function
+  | None -> Http_exn.unauthorized
+              ("Missing OAuth token " ^ ts.string_of_key key)
+  | Some token ->
+      request token >>= fun x ->
+      match x with
+      | `Retry_unauthorized
+      | `Retry_5xx ->
+          (match x with
+           | `Retry_unauthorized ->
+               get_access_token ts ~refresh:true key
+           | `Retry_5xx ->
+               Lwt_unix.sleep 1.0 >>= fun () ->
+               return (Some token)
+           | `Result _ ->
+               assert false
+          ) >>= fun opt_token ->
+          (match opt_token with
+           | None ->
+               Http_exn.unauthorized
+                 ("Invalid OAuth refresh_token for " ^ ts.string_of_key key)
+           | Some token ->
+               Cloudwatch.send_event "google.api.retry" >>= fun () ->
+               request token >>= function
+               | `Retry_unauthorized ->
+                   failwith
+                     ("Cannot authenticate with fresh access_token"
+                      ^ ts.string_of_key key)
 
-                 | `Retry_5xx ->
-                     Http_exn.service_unavailable "Google API is not working"
+               | `Retry_5xx ->
+                   Http_exn.service_unavailable "Google API is not working"
 
-                 | `Result result ->
-                     return result
-            )
-        | `Result result -> return result
-end
+               | `Result result ->
+                   return result
+          )
+      | `Result result -> return result
