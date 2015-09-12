@@ -1,6 +1,7 @@
 OCAML_LIBS = $(OCAML_LIBS_google-auth)
 
 FILES[] =
+  google_http
   google_scope
   google_api_t
   google_api_j

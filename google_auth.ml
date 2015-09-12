@@ -50,6 +50,24 @@ let minimum_assistant_scopes = minimum_scopes @ [
   `Gmail;
 ]
 
+(* Return value used by API calls that my fail the first time
+   and should be retried after fixing something.
+
+   In the case of Google APIs, we try a request using the saved access token
+   and if it fails the first time (`Retry), we request a fresh
+   access token and retry.
+
+   This type is equivalent to the option type, but its intent is clearer.
+*)
+type 'a retriable = [
+  | `Result of 'a
+      (* Final result *)
+  | `Retry_unauthorized
+      (* Invalid access token, need to obtain a new token before retrying *)
+  | `Retry_later
+      (* Retry later with exponential backoff *)
+]
+
 let auth_uri ?login_hint ~request_new_refresh_token ~scopes state =
   let approval_prompt =
     if request_new_refresh_token then
@@ -294,52 +312,55 @@ let get_access_token (ts : _ token_store) ~refresh:refresh_it key =
    Make a request requiring a Google access token.
    If the stored access token turns out to be invalid,
    the call is retried after obtaining a fresh access token from Google.
+
+   This also incorporate retries with exponential backoff.
 *)
-let request
+let rec request
     (ts : _ token_store)
+    ?(max_attempts = 6)
+    ?(backoff_sleep = 1.)
     key
-    (request_with_token : string -> 'a Http_result.retriable Lwt.t)
+    (request_with_token : string -> 'a retriable Lwt.t)
   : 'a Lwt.t =
 
-  let request token =
+  if max_attempts <= 0 then
+    invalid_arg "Google_auth.request: max_attempts";
+
+  if not (backoff_sleep >= 0.) then
+    invalid_arg "Google_auth.request: initial_backoff_sleep";
+
+  let run_request token =
     Cloudwatch.time "google.api.any.latency" (fun () ->
       request_with_token token
     )
   in
 
   get_access_token ts ~refresh:false key >>= function
-  | None -> Http_exn.unauthorized
-              ("Missing OAuth token " ^ ts.string_of_key key)
+  | None ->
+      Http_exn.unauthorized
+        ("Missing OAuth token " ^ ts.string_of_key key)
   | Some token ->
-      request token >>= fun x ->
+      run_request token >>= fun x ->
       match x with
-      | `Retry_unauthorized
-      | `Retry_5xx ->
-          (match x with
-           | `Retry_unauthorized ->
-               get_access_token ts ~refresh:true key
-           | `Retry_5xx ->
-               Lwt_unix.sleep 1.0 >>= fun () ->
-               return (Some token)
-           | `Result _ ->
-               assert false
-          ) >>= fun opt_token ->
-          (match opt_token with
+      | `Retry_unauthorized when max_attempts > 1 ->
+          (get_access_token ts ~refresh:true key >>= function
            | None ->
-               Http_exn.unauthorized
-                 ("Invalid OAuth refresh_token for " ^ ts.string_of_key key)
-           | Some token ->
-               Cloudwatch.send_event "google.api.retry" >>= fun () ->
-               request token >>= function
-               | `Retry_unauthorized ->
-                   failwith
-                     ("Cannot authenticate with fresh access_token"
-                      ^ ts.string_of_key key)
-
-               | `Retry_5xx ->
-                   Http_exn.service_unavailable "Google API is not working"
-
-               | `Result result ->
-                   return result
+               failwith
+                 ("Cannot authenticate with fresh access_token"
+                  ^ ts.string_of_key key)
+           | Some _access_token ->
+               request ts ~max_attempts:(max_attempts - 1) ~backoff_sleep
+                 key request_with_token
           )
-      | `Result result -> return result
+      | `Retry_later when max_attempts > 1 ->
+          Lwt_unix.sleep backoff_sleep >>= fun () ->
+          request ts
+            ~max_attempts: (max_attempts - 1)
+            ~backoff_sleep: (backoff_sleep *. 2.)
+            key request_with_token
+
+      | `Retry_unauthorized | `Retry_later -> (* giving up *)
+          Http_exn.service_unavailable "Google service is down"
+
+      | `Result result ->
+          return result
