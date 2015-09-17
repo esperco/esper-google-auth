@@ -338,7 +338,7 @@ let rec request
   get_access_token ts ~refresh:false key >>= function
   | None ->
       Http_exn.unauthorized
-        ("Missing OAuth token " ^ ts.string_of_key key)
+        ("Missing OAuth token for " ^ ts.string_of_key key)
   | Some token ->
       run_request token >>= fun x ->
       match x with
