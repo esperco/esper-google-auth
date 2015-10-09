@@ -112,27 +112,23 @@ let auth_uri ?login_hint ~request_new_refresh_token ~scopes state =
 let oauth_token_uri () =
   Google_api_util.make_uri
     ~host: "accounts.google.com"
-    ~path: "/o/oauth2/token"
-    ()
+    "/o/oauth2/token"
 
 let oauth_revoke_uri access_token =
   Google_api_util.make_uri
     ~host: "accounts.google.com"
-    ~path: "/o/oauth2/revoke"
     ~query: ["token", [access_token]]
-    ()
+    "/o/oauth2/revoke"
 
 let oauth_id_token_info_uri token =
   Google_api_util.make_uri
-    ~path: "/oauth2/v1/tokeninfo"
     ~query: ["id_token", [token]]
-    ()
+    "/oauth2/v1/tokeninfo"
 
 let oauth_access_token_info_uri token =
   Google_api_util.make_uri
-    ~path: "/oauth2/v1/tokeninfo"
     ~query: ["access_token", [token]]
-    ()
+    "/oauth2/v1/tokeninfo"
 
 let form_headers =
   ["Content-Type", "application/x-www-form-urlencoded"]
