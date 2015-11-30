@@ -5,6 +5,7 @@ type scope = [
   | `Profile
   | `Email_address
   | `Calendar
+  | `Contacts
   | `Gmail
   | `Drive
       (* Requests *full* access to a user's Google Drive. This is fine for
@@ -40,6 +41,8 @@ let parse_scope = function
 
   | "https://www.googleapis.com/auth/drive" -> Some `Drive
 
+  | "https://www.googleapis.com/auth/contacts.readonly" -> Some `Contacts
+
   | _ -> None
 
 
@@ -49,6 +52,7 @@ let string_of_scope : scope -> string = function
   | `Calendar -> "https://www.googleapis.com/auth/calendar"
   | `Gmail -> "https://mail.google.com/"
   | `Drive -> "https://www.googleapis.com/auth/drive"
+  | `Contacts -> "https://www.googleapis.com/auth/contacts.readonly"
 
 let split =
   let rex = lazy (Pcre.regexp " +") in
