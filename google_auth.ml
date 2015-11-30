@@ -41,6 +41,8 @@ let minimum_scopes = [
      in the setup flow.
   *)
   `Calendar;
+
+  `Contacts;
 ]
 
 let minimum_executive_scopes = minimum_scopes
