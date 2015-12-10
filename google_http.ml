@@ -37,19 +37,19 @@ let retriable status continue : _ Google_auth.retriable Lwt.t =
    such as 200 OK or 404 Not Found have already been handled.
 *)
 let fail call_name status body =
-  let error_fun =
+  let error_fun msg =
     match status with
     | `Bad_request (* 400 *) ->
-        Http_exn.internal_error
+        Http_exn.internal_error msg
     | `Forbidden (* 403 *) ->
         (* TODO: inspect response and determine whether it's retriable;
            Gmail API seems to be using code 429 rather than 403
            for their rateLimitExceeded error. *)
-        Http_exn.forbidden
+        Http_exn.forbidden msg
     | `Not_found (* 404 *) ->
-        Http_exn.not_found
+        Http_exn.not_found msg
     | _ ->
-        Http_exn.internal_error
+        Http_exn.internal_error msg
   in
   let message =
     sprintf "%s: %s: %s"
