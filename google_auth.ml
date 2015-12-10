@@ -279,6 +279,9 @@ type 'k token_store = {
   get: 'k -> google_oauth_tokens option Lwt.t;
   put: 'k -> google_oauth_tokens -> unit Lwt.t;
   remove: 'k -> google_oauth_tokens option Lwt.t;
+
+  (* Exceptions raised when getting an HTTP error response *)
+  unauthorized: ('k -> exn Lwt.t);
 }
 
 let get_access_token (ts : _ token_store) ~refresh:refresh_it key =
@@ -335,8 +338,8 @@ let rec request
 
   get_access_token ts ~refresh:false key >>= function
   | None ->
-      Http_exn.unauthorized
-        ("Missing OAuth token for " ^ ts.string_of_key key)
+      ts.unauthorized key >>= fun exn ->
+      Trax.raise __LOC__ exn
   | Some token ->
       run_request token >>= fun x ->
       match x with
