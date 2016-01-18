@@ -45,9 +45,7 @@ let minimum_scopes = [
   `Contacts;
 ]
 
-let minimum_executive_scopes = minimum_scopes
-
-let minimum_assistant_scopes = minimum_scopes @ [
+let minimum_scopes_plus_email = minimum_scopes @ [
   (* GMail messages *)
   `Gmail;
 ]
