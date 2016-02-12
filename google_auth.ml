@@ -130,9 +130,6 @@ let oauth_access_token_info_uri token =
     ~query: ["access_token", [token]]
     "/oauth2/v1/tokeninfo"
 
-let form_headers =
-  ["Content-Type", "application/x-www-form-urlencoded"]
-
 let auth_header access_token =
   "Authorization", "Bearer " ^ access_token
 
@@ -161,8 +158,7 @@ let get_token code redirect_uri =
            "client_secret", [client_secret];
            "redirect_uri",  [redirect_uri];
            "grant_type",    ["authorization_code"]] in
-  let body = Uri.encoded_of_query q in
-  Util_http_client.post ~headers:form_headers ~body (oauth_token_uri ())
+  Util_http_client.post_form (oauth_token_uri ()) q
   >>= fun (_status, _headers, body) ->
   match Google_api_j.oauth_token_result_of_string body with
     | { Google_api_t.error = Some error } ->
@@ -198,8 +194,7 @@ let refresh (refresh_token, opt_access_token) =
            "client_id",     [client_id];
            "client_secret", [client_secret];
            "grant_type",    ["refresh_token"]] in
-  let body = Uri.encoded_of_query q in
-  Util_http_client.post ~headers:form_headers ~body (oauth_token_uri ())
+  Util_http_client.post_form (oauth_token_uri ()) q
   >>= fun (_status, _headers, body) ->
   match Google_api_j.oauth_token_result_of_string body with
   | {Google_api_t.access_token = Some access_token; expires_in} ->
