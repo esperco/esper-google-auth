@@ -45,9 +45,9 @@ let fail call_name status body =
         (* TODO: inspect response and determine whether it's retriable;
            Gmail API seems to be using code 429 rather than 403
            for their rateLimitExceeded error. *)
-        Http_exn.forbidden msg
+        Http_exn.forbidden `Google_access_forbidden msg
     | `Not_found (* 404 *) ->
-        Http_exn.not_found msg
+        Http_exn.not_found `Google_not_found msg
     | _ ->
         Http_exn.internal_error msg
   in
