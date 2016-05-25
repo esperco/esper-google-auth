@@ -153,11 +153,11 @@ let oauth_revoke access_token =
   a one-time code posted by Google.
 *)
 let get_token code redirect_uri =
-  let q = ["code",          [code];
-           "client_id",     [client_id];
-           "client_secret", [client_secret];
-           "redirect_uri",  [redirect_uri];
-           "grant_type",    ["authorization_code"]] in
+  let q = ["code",          code;
+           "client_id",     client_id;
+           "client_secret", client_secret;
+           "redirect_uri",  redirect_uri;
+           "grant_type",    "authorization_code"] in
   Util_http_client.post_form (oauth_token_uri ()) q
   >>= fun (_status, _headers, body) ->
   match Google_api_j.oauth_token_result_of_string body with
@@ -190,10 +190,10 @@ let get_token code redirect_uri =
 let refresh (refresh_token, opt_access_token) =
   logf `Info "Refreshing Google access token";
   let open Account_t in
-  let q = ["refresh_token", [refresh_token];
-           "client_id",     [client_id];
-           "client_secret", [client_secret];
-           "grant_type",    ["refresh_token"]] in
+  let q = ["refresh_token", refresh_token;
+           "client_id",     client_id;
+           "client_secret", client_secret;
+           "grant_type",    "refresh_token"] in
   Util_http_client.post_form (oauth_token_uri ()) q
   >>= fun (_status, _headers, body) ->
   match Google_api_j.oauth_token_result_of_string body with
