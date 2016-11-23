@@ -273,8 +273,18 @@ type 'k token_store = {
   put: 'k -> google_oauth_tokens -> unit Lwt.t;
   remove: 'k -> google_oauth_tokens option Lwt.t;
 
-  (* Exceptions raised when getting an HTTP error response *)
-  unauthorized: ('k -> exn Lwt.t);
+  (* Exception to be raised when we find that we don't have a token
+     (refresh_token) or that it's no longer valid.
+
+     Common causes are that the user revoked Esper access
+     to their Google account, or that they changed their Google password.
+     It's also possible that the token is still valid but some new permissions
+     are required.
+
+     This should result in prompting the user for login to we can obtain
+     a valid token.
+  *)
+  require_new_token: ('k -> exn Lwt.t);
 }
 
 let get_access_token (ts : _ token_store) ~refresh:refresh_it key =
@@ -331,7 +341,7 @@ let rec request
 
   get_access_token ts ~refresh:false key >>= function
   | None ->
-      ts.unauthorized key >>= fun exn ->
+      ts.require_new_token key >>= fun exn ->
       Trax.raise __LOC__ exn
   | Some token ->
       run_request token >>= fun x ->
@@ -339,9 +349,8 @@ let rec request
       | `Retry_unauthorized when max_attempts > 1 ->
           (get_access_token ts ~refresh:true key >>= function
            | None ->
-               failwith
-                 ("Cannot authenticate with fresh access_token"
-                  ^ ts.string_of_key key)
+               ts.require_new_token key >>= fun exn ->
+               Trax.raise __LOC__ exn
            | Some _access_token ->
                request ts ~max_attempts:(max_attempts - 1) ~backoff_sleep
                  key request_with_token
