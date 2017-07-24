@@ -281,7 +281,7 @@ type 'k token_store = {
      It's also possible that the token is still valid but some new permissions
      are required.
 
-     This should result in prompting the user for login to we can obtain
+     This should result in prompting the user for login so we can obtain
      a valid token.
   *)
   require_new_token: ('k -> exn Lwt.t);
@@ -339,19 +339,27 @@ let rec request
     )
   in
 
+  let fail_and_clear_credentials () =
+    ts.remove key >>= fun opt_tokens ->
+    ts.require_new_token key >>= fun exn ->
+    Trax.raise __LOC__ exn
+  in
+
   get_access_token ts ~refresh:false key >>= function
   | None ->
-      ts.require_new_token key >>= fun exn ->
-      Trax.raise __LOC__ exn
+      fail_and_clear_credentials ()
   | Some token ->
+      (* try request with whatever access_token we have, which may be
+         expired *)
       run_request token >>= fun x ->
       match x with
       | `Retry_unauthorized when max_attempts > 1 ->
+          (* request didn't work; let's obtain a fresh access_token *)
           (get_access_token ts ~refresh:true key >>= function
            | None ->
-               ts.require_new_token key >>= fun exn ->
-               Trax.raise __LOC__ exn
-           | Some _access_token ->
+               fail_and_clear_credentials ()
+           | Some access_token ->
+               (* try request again *)
                request ts ~max_attempts:(max_attempts - 1) ~backoff_sleep
                  key request_with_token
           )
@@ -362,7 +370,12 @@ let rec request
             ~backoff_sleep: (backoff_sleep *. 2.)
             key request_with_token
 
-      | `Retry_unauthorized | `Retry_later -> (* giving up *)
+      | `Retry_unauthorized ->
+          (* reached maximum number of attempts, giving up *)
+          fail_and_clear_credentials ()
+
+      | `Retry_later ->
+          (* reached maximum number of attempts, giving up *)
           Http_exn.service_unavailable "Google service is down"
 
       | `Result result ->
